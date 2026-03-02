@@ -1,0 +1,485 @@
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>JsSIP Demo - WebRTC 软电话示例</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+
+    <body>
+        <div class="____ccbar____">
+            <script src="./call.js" type="text/javascript"></script> 
+            <script src="./jssip-3.4.4.js"></script>
+            
+            <div class="ccbar_layout">
+            <!-- 左侧：签入配置 -->
+            <div class="ccbar_signin_card">
+                <h2 class="ccbar_signin_title">SIP 签入</h2>
+                <div class="ccbar_signin_form">
+                    <div class="ccbar_form_row">
+                        <label>SIP 服务器</label>
+                        <input id="____ccbar_url_input____" class="ccbar_input" placeholder="如 sip.example.com" />
+                    </div>
+                    <div class="ccbar_form_row">
+                        <label>用户名 / 分机号</label>
+                        <input id="____ccbar_username_input____" class="ccbar_input" placeholder="请输入" />
+                    </div>
+                    <div class="ccbar_form_row">
+                        <label>密码</label>
+                        <input id="____ccbar_password_input____" class="ccbar_input" type="password" placeholder="请输入密码" />
+                    </div>
+                    <div class="ccbar_form_row ccbar_form_row_half">
+                        <div class="ccbar_form_group">
+                            <label>WSS 端口</label>
+                            <input id="____ccbar_wss_port_input____" class="ccbar_input" value="8443" title="WebSocket Secure 端口" />
+                        </div>
+                        <div class="ccbar_form_group">
+                            <label>STUN 端口</label>
+                            <input id="____ccbar_turn_port_input____" class="ccbar_input" value="3478" />
+                        </div>
+                    </div>
+                    <div class="ccbar_form_row">
+                        <label>STUN 地址 <span class="ccbar_optional">（可选）</span></label>
+                        <input id="____ccbar_turn_ip_input____" class="ccbar_input" placeholder="留空则使用 SIP 服务器" />
+                    </div>
+                    <div class="ccbar_signin_actions">
+                        <button type="button" class="ccbar_btn ccbar_btn_primary" onclick="ccbar.signIn()">签入</button>
+                        <button type="button" class="ccbar_btn ccbar_btn_secondary" onclick="ccbar.signOut()">退签</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：拨号与通话控制 -->
+            <div class="ccbar_toolbar">
+                <div class="ccbar_status_area">
+                    <span id="____ccbar_wor_status____" class="ccbar_status ccbar_work_status_offline">离线</span>
+                    <span id="____ccbar_ser_status____" class="ccbar_status ccbar_serv_status_idle">空闲</span>
+                    <span id="____ccbar_sip_status____" class="ccbar_status ccbar_sip_status_unreg">未注册</span>
+                </div>
+                <div class="ccbar_dial_area">
+                    <input id="____ccbar_numb_input____" class="ccbar_number_input" placeholder="拨号 / 转接号码" />
+                </div>
+                <div class="ccbar_buttons">
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.doCall()">外呼</button>
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.hangup()">挂断</button>
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.transSo()">转接</button>
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.holdCall()">保持</button>
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.unholdCall()">恢复</button>
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.setId()">空闲</button>
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.setBu()">置忙</button>
+                    <button type="button" class="ccbar_btn ccbar_btn_action" onclick="ccbar.setRe()">休息</button>
+                </div>
+                <div id="____ccbar_errori____" class="ccbar_error"></div>
+            </div>
+            </div>
+        </div>
+
+            <style>
+                * { box-sizing: border-box; }
+                body {
+                    margin: 0;
+                    padding: 24px;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                    background: linear-gradient(160deg, #f0f7ff 0%, #e8f4fc 100%);
+                    min-height: 100vh;
+                }
+
+                .____ccbar____ {
+                    max-width: 900px;
+                    margin: 0 auto;
+                }
+
+                .ccbar_layout {
+                    display: flex;
+                    gap: 24px;
+                    align-items: stretch;
+                }
+
+                @media (max-width: 720px) {
+                    .ccbar_layout {
+                        flex-direction: column;
+                    }
+                }
+
+                /* 左侧：签入卡片 */
+                .ccbar_signin_card {
+                    flex: 1;
+                    min-width: 280px;
+                    background: #fff;
+                    border-radius: 16px;
+                    padding: 24px;
+                    box-shadow: 0 4px 24px rgba(100, 149, 237, 0.08);
+                    border: 1px solid rgba(147, 197, 253, 0.3);
+                }
+
+                .ccbar_signin_title {
+                    margin: 0 0 20px 0;
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #374151;
+                    letter-spacing: 0.02em;
+                }
+
+                .ccbar_signin_form {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
+
+                .ccbar_form_row {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+
+                .ccbar_form_row_half {
+                    flex-direction: row;
+                    gap: 12px;
+                }
+
+                .ccbar_form_row_half .ccbar_form_group {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+
+                .ccbar_form_row label,
+                .ccbar_form_group label {
+                    font-size: 13px;
+                    color: #6b7280;
+                    font-weight: 500;
+                }
+
+                .ccbar_optional {
+                    font-weight: 400;
+                    color: #9ca3af;
+                }
+
+                .ccbar_input {
+                    height: 40px;
+                    padding: 0 14px;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                    background: #fafafa;
+                }
+
+                .ccbar_input:hover {
+                    border-color: #c7d2fe;
+                }
+
+                .ccbar_input:focus {
+                    outline: none;
+                    border-color: #93c5fd;
+                    box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.25);
+                    background: #fff;
+                }
+
+                .ccbar_signin_actions {
+                    display: flex;
+                    gap: 12px;
+                    margin-top: 8px;
+                }
+
+                .ccbar_btn {
+                    padding: 10px 24px;
+                    border: none;
+                    border-radius: 12px;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+
+                .ccbar_btn_primary {
+                    background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+                    color: #fff;
+                    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+                }
+
+                .ccbar_btn_primary:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+                }
+
+                .ccbar_btn_secondary {
+                    background: #f3f4f6;
+                    color: #6b7280;
+                }
+
+                .ccbar_btn_secondary:hover {
+                    background: #e5e7eb;
+                }
+
+                /* 右侧：拨号与通话控制 */
+                .ccbar_toolbar {
+                    flex: 1;
+                    min-width: 280px;
+                    background: #fff;
+                    border-radius: 16px;
+                    padding: 20px;
+                    box-shadow: 0 4px 24px rgba(100, 149, 237, 0.08);
+                    border: 1px solid rgba(147, 197, 253, 0.3);
+                }
+
+                .ccbar_status_area {
+                    display: flex;
+                    gap: 16px;
+                    margin-bottom: 12px;
+                    font-size: 13px;
+                }
+
+                .ccbar_status {
+                    padding: 4px 10px;
+                    border-radius: 8px;
+                    background: #f3f4f6;
+                }
+
+                .ccbar_dial_area {
+                    margin-bottom: 16px;
+                }
+
+                .ccbar_number_input {
+                    width: 100%;
+                    height: 44px;
+                    padding: 0 16px;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 12px;
+                    font-size: 15px;
+                    transition: border-color 0.2s, box-shadow 0.2s;
+                    background: #fafafa;
+                }
+
+                .ccbar_number_input:focus {
+                    outline: none;
+                    border-color: #93c5fd;
+                    box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.25);
+                    background: #fff;
+                }
+
+                .ccbar_buttons {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                }
+
+                .ccbar_btn_action {
+                    flex: 1;
+                    min-width: 70px;
+                    background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
+                    color: #fff;
+                }
+
+                .ccbar_btn_action:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 8px rgba(96, 165, 250, 0.4);
+                }
+
+                .ccbar_error {
+                    margin-top: 12px;
+                    font-size: 13px;
+                    color: #dc2626;
+                    display: none;
+                }
+
+                /* 提示弹窗 - 偏上、小巧、有动画、非白色 */
+                .ccbar_toast_overlay {
+                    position: fixed;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0, 0, 0, 0.3);
+                    display: flex;
+                    justify-content: center;
+                    align-items: flex-start;
+                    padding-top: 5%;
+                    z-index: 10001;
+                    pointer-events: none;
+                }
+
+                .ccbar_toast_modal {
+                    background: linear-gradient(145deg, #e0e7ff 0%, #c7d2fe 100%);
+                    border-radius: 12px;
+                    width: 220px;
+                    max-width: 85vw;
+                    padding: 14px 18px;
+                    text-align: center;
+                    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+                    border: 1px solid rgba(147, 197, 253, 0.4);
+                    animation: ccbar_toast_in 0.35s ease-out;
+                }
+
+                @keyframes ccbar_toast_in {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-20px) scale(0.95);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                    }
+                }
+
+                .ccbar_toast_content {
+                    font-size: 13px;
+                    color: #4338ca;
+                    line-height: 1.45;
+                }
+
+                /* 状态颜色 */
+                .ccbar_work_status_offline { color: #9ca3af; }
+                .ccbar_work_status_online { color: #22c55e; }
+                .ccbar_work_status_busy { color: #ef4444; }
+                .ccbar_work_status_reset { color: #6366f1; }
+                .ccbar_serv_status_idle { color: #22c55e; }
+                .ccbar_serv_status_busy { color: #ef4444; }
+                .ccbar_sip_status_reg { color: #22c55e; }
+                .ccbar_sip_status_unreg { color: #9ca3af; }
+
+                /* 来电弹窗 */
+                .call-modal-overlay {
+                    position: fixed;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    background: rgba(0, 0, 0, 0.4);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                }
+
+                .call-modal {
+                    background: #fff;
+                    border-radius: 20px;
+                    width: 300px;
+                    padding: 28px;
+                    text-align: center;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+                }
+
+                .caller-name {
+                    font-size: 20px;
+                    font-weight: 600;
+                    color: #374151;
+                    margin-bottom: 8px;
+                }
+
+                .button-container {
+                    display: flex;
+                    justify-content: center;
+                    gap: 16px;
+                    margin-top: 20px;
+                }
+
+                .call-button {
+                    padding: 12px 28px;
+                    border: none;
+                    border-radius: 12px;
+                    font-size: 15px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+
+                .answer-button {
+                    background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+                    color: #fff;
+                }
+
+                .answer-button:hover { opacity: 0.9; transform: scale(1.02); }
+
+                .cancel-button {
+                    background: #f3f4f6;
+                    color: #6b7280;
+                }
+
+                .cancel-button:hover { background: #e5e7eb; }
+            </style>
+            <script>
+                let ccbar = null;
+                let callModal = null;
+
+                window.onload = function() { 
+                  ccbar = new CCBarSDK({
+                    eventHandle: {
+                      onError: function(msg) {
+                        console.error('错误:', msg);
+                      },
+                      onRecviceCall: function(number, data) {
+                        // alert('新的来电: ' + number);
+                        // ccbar.answer();
+                        showIncomingCallModal(number);
+                        console.log('来电数据:', data);
+                      },
+                      onStatusChange: function(workStatus, serviceStatus, signin, sip) {
+                        console.log('状态变更:', {workStatus, serviceStatus, signin, sip});
+                      },
+                      onWebPhoneHandle: function(type, data, options) {
+                        console.log('WebPhone事件:', type, data, options);
+                        if(type === 'incoming.ended' || type === 'incoming.failed'){
+                          if (callModal) {
+                            callModal.close();
+                            callModal = null;
+                          }
+                        }
+                      }
+                    },
+                  });  
+                }
+
+                function showIncomingCallModal(callerName){
+                    if (callModal) {
+                      callModal.close();
+                    }
+
+                    // 创建弹窗元素
+                    const modal = document.createElement('div');
+                    modal.className = 'call-modal-overlay';
+                    modal.innerHTML = `
+                      <div class="call-modal">
+                        <div class="caller-info">
+                          <div class="caller-name">${callerName}</div>
+                        </div>
+                        <div class="button-container">
+                          <button class="call-button answer-button">接听</button>
+                          <button class="call-button cancel-button">拒接</button>
+                        </div>
+                      </div>                                                             
+                    `;
+                    document.body.appendChild(modal);
+
+                    modal.querySelector('.answer-button').addEventListener('click', () => {
+                      ccbar.answer();
+                      modal.remove();
+                    });
+      
+                     modal.querySelector('.cancel-button').addEventListener('click', () => {
+                       ccbar.hangup();
+                       modal.remove();
+                       callModal = null;
+                     });
+      
+                    callModal = {
+                      close: () => {
+                        modal.remove();
+                        callModal = null;
+                      }
+                    };
+                }
+
+                function showCcbarToast(message) {
+                    if (!message) return;
+                    const overlay = document.createElement('div');
+                    overlay.className = 'ccbar_toast_overlay';
+                    overlay.innerHTML = `
+                        <div class="ccbar_toast_modal">
+                            <div class="ccbar_toast_content">${String(message).replace(/</g, '&lt;')}</div>
+                        </div>
+                    `;
+                    document.body.appendChild(overlay);
+                    setTimeout(() => overlay.remove(), 1000);
+                }
+            </script>
+        <audio id="remoteAudio" autoPlay></audio>
+    </body>
+</html>
